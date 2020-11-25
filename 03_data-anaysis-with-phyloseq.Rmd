@@ -1,6 +1,8 @@
 ---
-title: "Bonus: Handoff to phyloseq"
-output: html_notebook
+title: 'Bonus: Handoff to phyloseq'
+output:
+  html_document:
+    df_print: paged
 ---
 
 
@@ -34,7 +36,6 @@ library("dada2")
 ```
 
 
-
 ```{r}
 samples.out <- rownames(seqtab.nochim)
 subject <- sapply(strsplit(samples.out, "D"), `[`, 1)
@@ -46,6 +47,8 @@ samdf$When <- "Early"
 samdf$When[samdf$Day>100] <- "Late"
 rownames(samdf) <- samples.out
 ```
+
+
 
 
 ```{r}
@@ -126,6 +129,7 @@ length(get_taxa_unique(ps2, taxonomic.rank = "Genus"))
 ps3 = tax_glom(ps2, "Genus", NArm = TRUE)
 
 ```
+
 
 ```{r}
 library(phangorn)
@@ -735,6 +739,9 @@ ggplot() +  geom_point(data = sample_info,
        y = sprintf("Axis2 [%s%% Variance]",
                    100 * round(pca_res$eig[2] / sum(pca_res$eig), 2)),
        fill = "Feature Type", col = "Sample Type")
+```
+```{r}
+library(knitr)
 ```
 
 
