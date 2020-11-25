@@ -1,0 +1,54 @@
+---
+title: "metabarcoding with dada2: environment installation"
+output: github_document
+---
+
+
+
+```{bash}
+sudo apt-get update -y 
+sudo apt-get install -y libbz2-dev
+sudo apt-get install -y liblzma-dev
+```
+ 
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install(version = "3.12")
+```
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("dada2", version = "3.12")
+```
+
+
+```{r}
+library(dada2); packageVersion("dada2")
+```
+
+```{r}
+BiocManager::install("phangorn")
+BiocManager::install("DECIPHER")
+```
+
+```{r}
+install.packages("gridExtra")
+```
+
+```{r}
+install.packages("usethis")
+```
+
+```{r}
+library(usethis)
+```
+
+```{r}
+library(usethis)
+use_git_config(user.name = "Hamzaelkhati", user.email = "hamzaelkhati@gmail.com")
+```
+
+
+
