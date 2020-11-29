@@ -1,20 +1,38 @@
 ---
 title: "DADA2 Tuto"
-output: github_document
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 
 
+```{r}
+library(rmarkdown)
+library(knitr)
+```
+
+#ce tutoriel nécessite le packages dada2 et ggplot2 déja télécharger dans le fichier 00_install_packages
 
 ```{r}
 library(dada2); packageVersion("dada2")
+library(ggplot2)
 ```
-"
-We can then proceed with the tutorial :
-"
+
+#Les données utilsés ici sont des séquences d'amplicon Illumina Miseq 2x250 très chevauchantes de la région V4 du gène 16S, les 360 échantillons de matiere fécale sont prélevé de 12 souris, Ces données sont téléchargées à partir de l'emplacement de données suivant et décompressées( 01_data_import (https://mothur.s3.us-east-2.amazonaws.com/wiki/miseqsopdata.zip)) sous le nom de MiSeq_SOP
+
+# Partie1: importation des données MiSeq_SOP
+
+#l'emplacement de mes fichiés correspond au ~/phyloseq_tuto/MiSeq_SOP
 ```{r}
-path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
+path <- "~/phyloseq_tuto/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
 list.files(path)
 ```
+# Partie2: Filtrer et découper
+
+## Obtention des listes des fichiers fastq sens et anti-sens (fnFs et FnRs)
+
+#La premier et 2ème ligne de code sert a ordonner les fichiés fastq sens et anti-sens dans le meme ordre _R1_001.fastq et _R2_001.fastq avec path comme chemin de spécifique, et la 2ème c'est pour faire sortir des exemples de noms de fichies fastq en supposant que le nom est SAMPLENAME_XXX.fastq
 ```{r}
 # Forward and reverse fastq filenames have format: SAMPLENAME_R1_001.fastq and SAMPLENAME_R2_001.fastq
 fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
@@ -23,7 +41,9 @@ fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```
 
+## plots de qualité pour fnFs et fnRs
 
+#le plot de qualité montre les qualités de séquence sens est antisens dont la moyenne est en vert, la médiane la ligne orange pleine et les quartiles sont les lignes orange pointillées, ce code est pour affiché le score de qualité pour les 2 premieres échantillons 
 ```{r}
 plotQualityProfile(fnFs[1:2])
 ```
@@ -33,7 +53,9 @@ plotQualityProfile(fnFs[1:2])
 ```{r}
 plotQualityProfile(fnRs[1:2])
 ```
+## Filtration des données
 
+#noms de fichiers pour les fichiers fastq.gz filtrés, _F_filt.fastq.gz pour les forwards, _R_filt.fastq.gz pour les revers 
 ```{r}
 # Place filtered files in filtered/ subdirectory
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
@@ -42,14 +64,16 @@ names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 ```
 
-
+#ici on a tronquer les lectures sens à la position 245 car les lectures sens(forwards) maintiennent une qualité élevée tout au long avec une dimunition de score de qualités , et les lectures anti-sens (Revers)sont tronqués à la position 160 car le score de qualité diminue aprés cette position (TruncLen=c()). Nous choisissons également de couper les 10 premiers nucléotides de chaque lecture car ces positions de base sont particulièrement susceptibles de contenir des erreurs pathologiques.
 ```{r}
 out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
               maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
               compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
 head(out)
 ```
+## modèle d'erreur 
 
+#l'estimation des taux d'erreur des échantillon ce fait par un modèle d'erreur paramétrique ( err), tout d'abord l'algorithme doit commencer par une estimation initiale pour laquelle les taux d'erreur maximums possibles dans ces données sont utilisés, par exemple pour errF 33514080 de bases dans 139642 reads de 20 échantillons vont etre utilisé pour apprenez le taux d'erreur, par la suite il est utile de visualiser les taux d'erreur estimés par la fonction plotErrors pour errF et errR.
 ```{r}
 errF <- learnErrors(filtFs, multithread=TRUE)
 
@@ -58,11 +82,15 @@ errF <- learnErrors(filtFs, multithread=TRUE)
 errR <- learnErrors(filtRs, multithread=TRUE)
 
 ```
+
+#Les erreurs de substitutions, quand les clusters sont trop proches, peuvent être dues des erreurs de lecture. Les points gris sont les erreurs de substitutions. Pour les substitutions (A donne C, deuxième carré de graphique), dada2 pense que ce sont des erreurs car il a comparé à une autre séquence proche. Chaque point donne la probabilité d’avoir une substitutions de A donne C en fonction du Q score de la position. La courbe en noir représente la régression. On voit que le modèle suit les points. Plus le Q score est élevé plus le taux de substition est faible. On va appliquer ce modèle de substitution à tout notre jeu de données afin de le corriger ainsi que de corriger les erreurs. On peut ensuite considérer chaque séquence.
 ```{r}
 plotErrors(errF, nominalQ=TRUE)
 
 ```
+# partie3: Inférence d'échantillon
 
+#l'algorithme d'inférence de l'échantillon de base aux données de séquence filtrées et découpées. dadaFs et dadaRs sont issus de la fonction dada. Ils prennent les reads Foward et Reverse filtrés sur lesquelles on a mis des filtres mais aussi les erreurs Foward ou Reverse. On obtnient normalement des reads corrigé.
 ```{r}
 dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 
@@ -71,17 +99,29 @@ dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
 
 ```
+#Inspection de l' dada-class qui porte des diagnostics et des informations sur la qualité de chaque variante de séquence débruitée, exemple de 3ème echantillon.
+#'algorithme DADA2 a déduit 128  variantes de séquence à partir des séquences uniques de 1979. 
 ```{r}
-dadaFs[[3]]
-
+dadaFs[[1]]
 ```
+# partie3: Construire une table de séquence et supprimer des chimères
+ 
+#ici on va crée la «table OTU» commune, c'est-à-dire une table de caractéristiques échantillon par séquence valorisée par le nombre de fois que chaque séquence a été observée dans chaque échantillon.
+#Merger permet de refusionner les séquences Foward et Reverse pour reconstituer le V4.
+
 ```{r}
 mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
 # Inspect the merger data.frame from the first sample
 head(mergers[[1]])
 ```
+#Le tableau séquences montre les séquences combinées (Foward et Reverse). Dans le second tableau, la colonne nmatch montre le nombre de nucléotide qui match dans la régions de l’overlaps, et nindel vaut 0 car il n’y a pas d’indels dans Illumina. Prefer montre quelle séquence est prise entre R1 et R2 s’il y a des mismatsh au niveau des chevauchements. Pour choisir, l’ordinateur va regarder le meilleur Q score entre R1 et R2.
 
-Construct sequence table
+
+
+## Construire une table de séquence
+
+#A partir de la fonction mergers, on peut construire une table de séquence. La dimension de la table c’est 20 colonnes et 293 lignes. la fonction MakeSequenceTable construit une table analogue à une table d’OTU. C’est une matrice d’observation échantillon/séquence.
+#létape 2 correspond a l’alignement du R1 avec le R2, on peut peut faire une vérification pour voir si on obtient bien des séquences aux alentours de 250. On a les nombres de séquences que l’on retrouve dans chaque classes (1 dans 251, 88 dans 252, etc).
 ```{r}
 seqtab <- makeSequenceTable(mergers)
 dim(seqtab)
@@ -90,16 +130,22 @@ dim(seqtab)
 # Inspect distribution of sequence lengths
 table(nchar(getSequences(seqtab)))
 ```
+## supprimer les chimères
+
+#Ici on va détecter si le début d’une séquence appartient à une bactérie et la fin à une autre car ce qui est sûr c’est que le début de la séquence est dans notre jeu de données et la fin aussi. Le ratio entre le nombre de séquences sans les chimères divisés par le nombre avec les chimères est de 96%. Donc ce sont des occurences rares (les chimères).
+
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
 ```{r}
 1-sum(seqtab.nochim)/sum(seqtab)
-
 ```
+## Suivre les lectures dans le pipeline
 
+#ici on va suivre l’évolution du nombre de read à chaque étape. Et cela permet de vérifier qu’il n’y a pas eu trop de perte. Cette dernière peut être du à la filtration, le dénoising, quand on a mergé et on a aussi enlevé des chimères.
 
+#les resultats pour l'éch.1: On passe de 7793 à 6528, pur l'éch.2: de 5299 à 5017
 ```{r}
 getN <- function(x) sum(getUniques(x))
 track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
@@ -110,46 +156,46 @@ head(track)
 ```
 
 
-Assign taxonomy
+# Partie4: Attribuer une taxonomie
 
-
-```{bash}
-wget https://zenodo.org/record/3986799/files/silva_nr99_v138_train_set.fa.gz
-```
+#Pour faire l’assignation taxonomique, il faut une base de données de référence. Pour ce faire on utilise un algorithme d’assignation taxonomique, on va utiliser Silva 132 (01_data_import),la méthode de Blast qui va etre utiliser et le résultat d’une assignation taxonomique c’est une classification hétérogène avec des séquences qui vont s’arrêter au genre, à la classe, à la famille ou même au phylum.
 
 ```{r}
-taxa <- assignTaxonomy(seqtab.nochim, "~/tax/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
-
+taxa <- assignTaxonomy(seqtab.nochim, "~/phyloseq_tuto/tax/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
 ```
+
+#Avec un autre jeu de données pour l’assignation taxonomique, on peut essayer de voir s’il y a 100% de similarité avec d’autres séquences pour avoir des résultats jusqu’à l’espèce. Avec la commande précédente, on ne va que jusqu’au genre. On va donc ajouter les espèces dans le tableau taxa (01_data_import).
 
 ```{r}
-taxa.print <- taxa # Removing sequence rownames for display only
-rownames(taxa.print) <- NULL
-head(taxa.print)
+taxa <- addSpecies(taxa, "~/phyloseq_tuto/tax/silva_species_assignment_v138.fa.gz")
 ```
 
-```{bash}
-wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
-```
-
-```{r}
-taxa <- addSpecies(taxa, "~/tax/silva_species_assignment_v138.fa.gz")
-```
-
+#taxa.print prend la table taxa et enlève les noms de lignes de la table taxa.print par ce que ce sont les séquences.
 ```{r}
 taxa.print <- taxa # Removing sequence rownames for display only
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
+
+# Partie5: Évaluer la précision
+
+#On peut avoir une autre alternative pour pouvoir utiliser IdTaxa. Il y a une meilleure assignation taxonomique qu’avec l’autre (NBG classifier). Dans le jeu de données, il y avait une Mock community (souches connues dans des proportions connues). C’est le seul éléments de données qui permet d’avoir un recul sur le pipeline.
+
 ```{r}
 unqs.mock <- seqtab.nochim["Mock",]
 unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) # Drop ASVs absent in the Mock
 cat("DADA2 inferred", length(unqs.mock), "sample sequences present in the Mock community.\n")
 ```
+#Ici On va chercher toutes les séquences qui vont être notées Mock. On va ensuite les trier par abondances et regarder celles qui ne sont pas dans les ASV. Les unqs.mock qui sont supérieurs à 0 vont etre enlever
 
 ```{r}
 mock.ref <- getSequences(file.path(path, "HMP_MOCK.v35.fasta"))
 match.ref <- sum(sapply(names(unqs.mock), function(x) any(grepl(x, mock.ref))))
 cat("Of those,", sum(match.ref), "were exact matches to the expected reference sequences.\n")
+```
+#A travers ce code on va chercher  les vraies séquences qui sont dans le fichier HMP_MOCK.v35.fasta et on va les mettre dans l’objet Mock.ref. le résultat montre qu'on a 20 ASV différents dans la communauté mock et 20 sont des matchs exacts des séquences de références. On peut donc dire que DADA2 a bien fonctionné pour ces séquences là. On a pu tester le programme de dada2 sur les corrections.
+
+```{r}
+save.image(file = "02_data-analysis-with-DADA2_FinalENV")
 ```
 
