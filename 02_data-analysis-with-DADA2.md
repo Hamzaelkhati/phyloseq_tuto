@@ -1,4 +1,4 @@
-DADA2 Tuto\_EL KHATI Hamza
+DADA2 Tuto
 ================
 
   - [Partie1: importation des données
