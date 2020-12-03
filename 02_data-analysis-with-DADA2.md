@@ -1,4 +1,4 @@
-DADA2 Tuto
+DADA2 Tuto\_EL KHATI Hamza
 ================
 
   - [Partie1: importation des données
@@ -478,11 +478,9 @@ head(taxa.print)
 
 # Partie5: Évaluer la précision
 
-\#On peut avoir une autre alternative pour pouvoir utiliser IdTaxa. Il y
-a une meilleure assignation taxonomique qu’avec l’autre (NBG
-classifier). Dans le jeu de données, il y avait une Mock community
-(souches connues dans des proportions connues). C’est le seul éléments
-de données qui permet d’avoir un recul sur le pipeline.
+\#Dans le jeu de données, il y avait une Mock community (souches connues
+dans des proportions connues). C’est le seul éléments de données qui
+permet d’avoir un recul sur le pipeline.
 
 ``` r
 unqs.mock <- seqtab.nochim["Mock",]
